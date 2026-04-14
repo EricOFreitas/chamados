@@ -1,0 +1,117 @@
+// This is your Prisma schema file
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String   @id @default(cuid())
+  name      String
+  email     String   @unique
+  password  String
+  role      Role     @default(USER)
+  phone     String?
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  ticketsOpened    Ticket[]      @relation("TicketOpenedBy")
+  ticketsAssigned  Ticket[]      @relation("TicketAssignedTo")
+  comments         TicketComment[]
+  timeEntries      TimeEntry[]
+
+  @@map("users")
+}
+
+model Machine {
+  id        String   @id @default(cuid())
+  name      String
+  hostname  String?  @unique
+  location  String?
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tickets   Ticket[]
+
+  @@map("machines")
+}
+
+model Ticket {
+  id          String       @id @default(cuid())
+  title       String
+  description String
+  status      TicketStatus @default(OPEN)
+  priority    Priority     @default(MEDIUM)
+  resolvedAt  DateTime?
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  machineId  String
+  machine    Machine @relation(fields: [machineId], references: [id])
+
+  openedById String
+  openedBy   User   @relation("TicketOpenedBy", fields: [openedById], references: [id])
+
+  assignedToId String?
+  assignedTo   User?   @relation("TicketAssignedTo", fields: [assignedToId], references: [id])
+
+  comments    TicketComment[]
+  timeEntries TimeEntry[]
+
+  @@map("tickets")
+}
+
+model TicketComment {
+  id        String   @id @default(cuid())
+  content   String
+  createdAt DateTime @default(now())
+
+  ticketId String
+  ticket   Ticket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+
+  authorId String
+  author   User   @relation(fields: [authorId], references: [id])
+
+  @@map("ticket_comments")
+}
+
+model TimeEntry {
+  id              String    @id @default(cuid())
+  startedAt       DateTime
+  endedAt         DateTime?
+  durationMinutes Int?
+  notes           String?
+  createdAt       DateTime  @default(now())
+
+  ticketId     String
+  ticket       Ticket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+
+  technicianId String
+  technician   User   @relation(fields: [technicianId], references: [id])
+
+  @@map("time_entries")
+}
+
+enum Role {
+  USER
+  TECHNICIAN
+}
+
+enum TicketStatus {
+  OPEN
+  IN_PROGRESS
+  RESOLVED
+  CLOSED
+}
+
+enum Priority {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
