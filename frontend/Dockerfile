@@ -1,7 +1,7 @@
 FROM node:20-alpine AS build
 WORKDIR /app
 COPY package*.json ./
-RUN NODE_ENV=development npm ci
+RUN NODE_ENV=development npm ci --legacy-peer-deps
 COPY . .
 ARG VITE_API_URL=/api
 ENV VITE_API_URL=$VITE_API_URL
