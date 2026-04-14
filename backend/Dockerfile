@@ -15,6 +15,8 @@ RUN npx prisma generate
 FROM base AS runner
 COPY --from=deps /app/node_modules ./node_modules
 COPY --from=build /app/node_modules/.prisma ./node_modules/.prisma
+COPY --from=build /app/node_modules/.bin/prisma ./node_modules/.bin/prisma
+COPY --from=build /app/node_modules/prisma ./node_modules/prisma
 COPY . .
 
 EXPOSE 3001
