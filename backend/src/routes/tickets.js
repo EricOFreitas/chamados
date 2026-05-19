@@ -4,7 +4,6 @@ const prisma = require('../lib/prisma');
 const { authMiddleware, requireRole } = require('../middleware/auth');
 const { validate } = require('../middleware/validate');
 const { notifyTicketOpened, notifyTicketResolved } = require('../services/email');
-const { notifyTicketOpenedWA, notifyTicketResolvedWA } = require('../services/whatsapp');
 
 const router = express.Router();
 router.use(authMiddleware);
@@ -121,9 +120,8 @@ router.post(
       },
     });
 
-    // Notificações assíncronas (não bloqueiam a resposta)
+    // Notificação assíncrona (não bloqueia a resposta)
     notifyTicketOpened(ticket, ticket.openedBy).catch(() => {});
-    notifyTicketOpenedWA(ticket, ticket.openedBy).catch(() => {});
 
     res.status(201).json(ticket);
   }
@@ -182,7 +180,6 @@ router.patch(
     // Notificar ao resolver/fechar
     if (status === 'RESOLVED' || status === 'CLOSED') {
       notifyTicketResolved(ticket, ticket.openedBy).catch(() => {});
-      notifyTicketResolvedWA(ticket, ticket.assignedTo || ticket.openedBy).catch(() => {});
     }
 
     res.json(ticket);
