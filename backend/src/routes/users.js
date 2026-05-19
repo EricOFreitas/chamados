@@ -69,10 +69,11 @@ router.patch(
     body('password').optional().isLength({ min: 8 }),
     body('phone').optional().trim(),
     body('active').optional().isBoolean(),
+    body('role').optional().isIn(['USER', 'TECHNICIAN']),
     validate,
   ],
   async (req, res) => {
-    const { name, email, password, phone, active } = req.body;
+    const { name, email, password, phone, active, role } = req.body;
     const data = {};
 
     if (name !== undefined) data.name = name;
@@ -86,6 +87,7 @@ router.patch(
     if (password !== undefined) data.password = await bcrypt.hash(password, 12);
     if (phone !== undefined) data.phone = phone;
     if (active !== undefined) data.active = active;
+    if (role !== undefined) data.role = role;
 
     const user = await prisma.user.update({
       where: { id: req.params.id },
