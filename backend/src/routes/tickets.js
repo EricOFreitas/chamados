@@ -174,12 +174,20 @@ router.patch(
         machine: true,
         openedBy: { select: { id: true, name: true, email: true } },
         assignedTo: { select: { id: true, name: true } },
+        comments: {
+          orderBy: { createdAt: 'desc' },
+          include: { author: { select: { name: true, role: true } } },
+        },
       },
     });
 
     // Notificar ao resolver/fechar
     if (status === 'RESOLVED' || status === 'CLOSED') {
-      notifyTicketResolved(ticket, ticket.openedBy).catch(() => {});
+      // Texto de encerramento = último comentário do técnico, se houver
+      const resolution = ticket.comments.find(
+        (c) => c.author?.role === 'TECHNICIAN'
+      );
+      notifyTicketResolved(ticket, ticket.openedBy, resolution).catch(() => {});
     }
 
     res.json(ticket);

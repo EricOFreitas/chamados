@@ -1,13 +1,15 @@
 # Chamados
 
-Sistema web de suporte técnico para abertura e gestão de chamados, com controle de tempo de atendimento, notificações via e-mail e WhatsApp, e relatórios de produtividade.
+Sistema web de suporte técnico para abertura e gestão de chamados, com controle de tempo de atendimento, notificação por e-mail e relatórios de produtividade.
+
+> **Estado:** em produção, atendendo um cliente. A notificação por WhatsApp (Evolution API) foi escrita mas **nunca chegou a ser ligada** — veja *Não implementado* no fim deste README.
 
 ## Stack
 
 - **Frontend:** React + Vite + TailwindCSS
 - **Backend:** Node.js + Express + Prisma ORM
 - **Banco de dados:** PostgreSQL
-- **Notificações:** Nodemailer (SMTP) + Evolution API (WhatsApp)
+- **Notificações:** Nodemailer (SMTP)
 - **Deploy:** Coolify (self-hosted)
 
 ## Funcionalidades
@@ -16,7 +18,7 @@ Sistema web de suporte técnico para abertura e gestão de chamados, com control
 - Painel do técnico com fila de chamados e dashboard de resumo (atualização automática a cada 5s)
 - Timer de atendimento com registro de sessões e duração calculada
 - Comentários internos por chamado
-- Notificação ao técnico via WhatsApp + e-mail ao abrir e encerrar chamados
+- Notificação por e-mail: ao técnico quando um chamado é aberto, ao solicitante quando é encerrado (incluindo o texto de resolução)
 - Relatórios por período: total de chamados, tempo médio, gráficos por status, prioridade e máquina
 - Gerenciamento de usuários e máquinas (somente técnico)
 - Autenticação JWT com refresh token
@@ -30,7 +32,7 @@ chamados/
     src/
       middleware/     → auth JWT, role guard, validação
       routes/         → auth, users, machines, tickets, comments, time, reports
-      services/       → email (nodemailer), whatsapp (Evolution API)
+      services/       → email (nodemailer)
       lib/            → instância Prisma
     Dockerfile
   frontend/
@@ -58,9 +60,6 @@ SMTP_USER=email@exemplo.com
 SMTP_PASS=senha
 TECHNICIAN_EMAIL=tecnico@exemplo.com
 TECHNICIAN_PHONE=5511999999999   # formato DDI + DDD + número
-EVOLUTION_API_URL=https://sua-evolution.exemplo.com
-EVOLUTION_API_TOKEN=seu_token
-EVOLUTION_INSTANCE=nome_da_instancia
 FRONTEND_URL=https://chamados.exemplo.com
 ```
 
@@ -112,3 +111,16 @@ cp .env.example .env
 npm install
 npm run dev            # porta 5173 (proxy /api → localhost:3001)
 ```
+
+---
+
+## Não implementado
+
+O arquivo `backend/src/services/whatsapp.js` implementa envio via **Evolution API**, mas
+**nenhum módulo o importa** — é código inativo. O recurso nunca entrou em produção e o
+container da Evolution API está desligado.
+
+Para ativar seria preciso: subir uma instância da Evolution API, definir
+`EVOLUTION_API_URL`, `EVOLUTION_API_TOKEN` e `EVOLUTION_INSTANCE`, e chamar
+`notifyTicketOpenedWA` / `notifyTicketResolvedWA` a partir de `backend/src/routes/tickets.js`,
+ao lado das notificações por e-mail.
