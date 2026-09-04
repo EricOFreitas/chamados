@@ -16,7 +16,7 @@ async function main() {
       email: 'tecnico@suporte.local',
       password: techPassword,
       role: 'TECHNICIAN',
-      phone: '5511999999999',
+      phone: null,
     },
   });
   console.log(`Técnico criado: ${technician.email}`);

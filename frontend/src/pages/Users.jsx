@@ -54,8 +54,8 @@ function UserModal({ user, onClose, onSaved }) {
             <input className="input" type="password" value={form.password} onChange={(e) => setField('password', e.target.value)} />
           </div>
           <div>
-            <label className="label">Telefone/WhatsApp</label>
-            <input className="input" value={form.phone} onChange={(e) => setField('phone', e.target.value)} placeholder="5511999999999" />
+            <label className="label">Telefone</label>
+            <input className="input" value={form.phone} onChange={(e) => setField('phone', e.target.value)} placeholder="(11) 99999-9999" />
           </div>
           <div>
             <label className="label">Perfil</label>

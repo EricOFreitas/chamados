@@ -2,7 +2,7 @@
 
 Sistema web de suporte técnico para abertura e gestão de chamados, com controle de tempo de atendimento, notificação por e-mail e relatórios de produtividade.
 
-> **Estado:** em produção, atendendo um cliente. A notificação por WhatsApp (Evolution API) foi escrita mas **nunca chegou a ser ligada** — veja *Não implementado* no fim deste README.
+> **Estado:** em produção, atendendo um cliente.
 
 ## Stack
 
@@ -15,10 +15,16 @@ Sistema web de suporte técnico para abertura e gestão de chamados, com control
 ## Funcionalidades
 
 - Abertura de chamados por funcionários com seleção de máquina e prioridade
+- Número sequencial por chamado (`#1`, `#2`, ...) usado na tela, na busca e nos e-mails
 - Painel do técnico com fila de chamados e dashboard de resumo (atualização automática a cada 5s)
+- Listagem com busca livre (número, título, descrição, resolução), filtros de status,
+  prioridade, máquina e período, ordenação por coluna e paginação
 - Timer de atendimento com registro de sessões e duração calculada
+- Encerramento com texto de resolução obrigatório, gravado no chamado, publicado como
+  comentário e enviado por e-mail — tudo numa única ação, que também fecha o timer aberto
 - Comentários internos por chamado
 - Notificação por e-mail: ao técnico quando um chamado é aberto, ao solicitante quando é encerrado (incluindo o texto de resolução)
+- Tela de Configurações com diagnóstico do SMTP e envio de e-mail de teste
 - Relatórios por período: total de chamados, tempo médio, gráficos por status, prioridade e máquina
 - Gerenciamento de usuários e máquinas (somente técnico)
 - Autenticação JWT com refresh token
@@ -31,16 +37,17 @@ chamados/
     prisma/           → schema, migrations, seed
     src/
       middleware/     → auth JWT, role guard, validação
-      routes/         → auth, users, machines, tickets, comments, time, reports
+      routes/         → auth, users, machines, tickets, comments, time, reports, health
       services/       → email (nodemailer)
-      lib/            → instância Prisma
+      lib/            → instância Prisma, helpers de data
+    scripts/          → test-email.js (diagnóstico de SMTP por linha de comando)
     Dockerfile
   frontend/
     src/
       api/            → axios + endpoints
       context/        → AuthContext
       components/     → Layout, Badges
-      pages/          → Login, Dashboard, Tickets, Reports, Users, Machines
+      pages/          → Login, Dashboard, Tickets, Reports, Users, Machines, Settings
     Dockerfile
     nginx.conf
 ```
@@ -55,13 +62,35 @@ Copie `backend/.env.example` para `backend/.env` e preencha:
 DATABASE_URL="postgresql://USER:PASS@HOST:5432/chamados"
 JWT_SECRET=segredo_forte
 JWT_REFRESH_SECRET=outro_segredo_forte
+TZ=America/Sao_Paulo             # define o que é "o dia" nos filtros e relatórios
 SMTP_HOST=smtp.exemplo.com
+SMTP_PORT=587                    # 465 exige SMTP_SECURE=true
+SMTP_SECURE=false
 SMTP_USER=email@exemplo.com
 SMTP_PASS=senha
+SMTP_FROM="Chamados <email@exemplo.com>"   # obrigatório: sem remetente o SMTP recusa
 TECHNICIAN_EMAIL=tecnico@exemplo.com
-TECHNICIAN_PHONE=5511999999999   # formato DDI + DDD + número
 FRONTEND_URL=https://chamados.exemplo.com
 ```
+
+### Diagnóstico de e-mail
+
+O backend registra o estado do SMTP no log já no boot (`[email] SMTP OK ...` ou
+`[email] SMTP FALHOU ...`) e loga cada envio com destinatário e erro do servidor.
+
+Para testar sem abrir um chamado:
+
+- **Pela interface:** *Configurações* → mostra as variáveis em uso, testa a conexão e
+  envia um e-mail de teste.
+- **Pelo console do container:**
+
+  ```bash
+  npm run test:email                    # só verifica conexão e configuração
+  npm run test:email -- voce@exemplo.com  # verifica e envia um e-mail de teste
+  ```
+
+> Ao alterar variáveis de ambiente no Coolify é preciso **Redeploy** — um Restart
+> não recarrega o ambiente do container.
 
 ### Frontend — variáveis de ambiente
 
@@ -94,6 +123,10 @@ npm run db:seed      # cria o técnico e as 13 máquinas iniciais
 4. Configurar as variáveis de ambiente em cada serviço
 5. Após o primeiro deploy do backend, executar via console: `npm run db:migrate && npm run db:seed`
 
+As migrations posteriores são aplicadas com `npm run db:migrate` (`prisma migrate deploy`).
+A migration `20260903000000_ticket_number_and_resolution` numera os chamados já existentes
+em ordem de abertura e preserva os dados.
+
 ## Desenvolvimento local
 
 ```bash
@@ -111,16 +144,3 @@ cp .env.example .env
 npm install
 npm run dev            # porta 5173 (proxy /api → localhost:3001)
 ```
-
----
-
-## Não implementado
-
-O arquivo `backend/src/services/whatsapp.js` implementa envio via **Evolution API**, mas
-**nenhum módulo o importa** — é código inativo. O recurso nunca entrou em produção e o
-container da Evolution API está desligado.
-
-Para ativar seria preciso: subir uma instância da Evolution API, definir
-`EVOLUTION_API_URL`, `EVOLUTION_API_TOKEN` e `EVOLUTION_INSTANCE`, e chamar
-`notifyTicketOpenedWA` / `notifyTicketResolvedWA` a partir de `backend/src/routes/tickets.js`,
-ao lado das notificações por e-mail.

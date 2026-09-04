@@ -31,11 +31,35 @@ export default function Dashboard() {
     }
   }, [])
 
+  // Atualiza a cada 30s, mas só com a aba visível: a 5s cada aba aberta gastava
+  // 180 das 300 requisições permitidas por janela e derrubava o próprio usuário.
   useEffect(() => {
     fetchTickets()
-    // Polling a cada 5 segundos
-    const interval = setInterval(fetchTickets, 5000)
-    return () => clearInterval(interval)
+
+    let interval = null
+    const start = () => {
+      if (interval === null) interval = setInterval(fetchTickets, 30000)
+    }
+    const stop = () => {
+      clearInterval(interval)
+      interval = null
+    }
+
+    const onVisibility = () => {
+      if (document.hidden) {
+        stop()
+      } else {
+        fetchTickets() // busca o que passou enquanto a aba esteve escondida
+        start()
+      }
+    }
+
+    if (!document.hidden) start()
+    document.addEventListener('visibilitychange', onVisibility)
+    return () => {
+      stop()
+      document.removeEventListener('visibilitychange', onVisibility)
+    }
   }, [fetchTickets])
 
   const open = tickets.filter((t) => t.status === 'OPEN').length
