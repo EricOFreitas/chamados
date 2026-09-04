@@ -47,6 +47,9 @@ export default function Layout() {
               <NavLink to="/machines" className={navItem}>
                 Máquinas
               </NavLink>
+              <NavLink to="/settings" className={navItem}>
+                Configurações
+              </NavLink>
             </>
           )}
         </nav>

@@ -33,3 +33,8 @@ export const usersApi = {
 export const reportsApi = {
   get: (from, to) => api.get('/reports', { params: { from, to } }),
 }
+
+export const healthApi = {
+  email: () => api.get('/health/email'),
+  testEmail: (to) => api.post('/health/email/test', to ? { to } : {}),
+}

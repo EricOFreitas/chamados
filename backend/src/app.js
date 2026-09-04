@@ -10,6 +10,7 @@ const ticketRoutes = require('./routes/tickets');
 const commentRoutes = require('./routes/comments');
 const timeRoutes = require('./routes/time');
 const reportRoutes = require('./routes/reports');
+const healthRoutes = require('./routes/health');
 
 const app = express();
 
@@ -26,12 +27,14 @@ app.use(cors({
 app.set('trust proxy', 1);
 app.use(express.json());
 
-// Rate limiting global
+// Rate limiting global. O teto precisa acomodar o polling do dashboard de
+// vários usuários com mais de uma aba aberta, sem deixar de barrar abuso.
 app.use(rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 300,
+  max: 1200,
   standardHeaders: true,
   legacyHeaders: false,
+  message: { error: 'Muitas requisições. Aguarde alguns minutos.' },
 }));
 
 // Rate limiting mais restrito para auth
@@ -49,6 +52,7 @@ app.use('/api/tickets', ticketRoutes);
 app.use('/api/tickets', commentRoutes);
 app.use('/api/tickets', timeRoutes);
 app.use('/api/reports', reportRoutes);
+app.use('/api/health', healthRoutes);
 
 // Health check
 app.get('/health', (_req, res) => res.json({ status: 'ok' }));

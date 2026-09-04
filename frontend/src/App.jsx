@@ -9,6 +9,7 @@ import TicketDetail from './pages/TicketDetail'
 import Reports from './pages/Reports'
 import Users from './pages/Users'
 import Machines from './pages/Machines'
+import Settings from './pages/Settings'
 
 function PrivateRoute({ children }) {
   const { user, loading } = useAuth()
@@ -61,6 +62,14 @@ function AppRoutes() {
           element={
             <TechnicianRoute>
               <Machines />
+            </TechnicianRoute>
+          }
+        />
+        <Route
+          path="settings"
+          element={
+            <TechnicianRoute>
+              <Settings />
             </TechnicianRoute>
           }
         />
