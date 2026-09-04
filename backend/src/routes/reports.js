@@ -3,6 +3,7 @@ const { query } = require('express-validator');
 const prisma = require('../lib/prisma');
 const { authMiddleware, requireRole } = require('../middleware/auth');
 const { validate } = require('../middleware/validate');
+const { dateRangeFilter } = require('../lib/dates');
 
 const router = express.Router();
 router.use(authMiddleware);
@@ -20,15 +21,8 @@ router.get(
     const { from, to } = req.query;
 
     const dateFilter = {};
-    if (from || to) {
-      dateFilter.createdAt = {};
-      if (from) dateFilter.createdAt.gte = new Date(from);
-      if (to) {
-        const toDate = new Date(to);
-        toDate.setHours(23, 59, 59, 999);
-        dateFilter.createdAt.lte = toDate;
-      }
-    }
+    const createdAt = dateRangeFilter(from, to);
+    if (createdAt) dateFilter.createdAt = createdAt;
 
     const [
       totalTickets,
@@ -72,38 +66,22 @@ router.get(
 
       // Chamados por dia (intervalo solicitado)
       (async () => {
-        if (from && to) {
-          return prisma.$queryRaw`
-            SELECT DATE("createdAt") as date, COUNT(*)::int as count
-            FROM tickets
-            WHERE "createdAt" >= ${new Date(from)} AND "createdAt" <= ${new Date(to + 'T23:59:59')}
-            GROUP BY DATE("createdAt")
-            ORDER BY date ASC
-          `
-        } else if (from) {
-          return prisma.$queryRaw`
-            SELECT DATE("createdAt") as date, COUNT(*)::int as count
-            FROM tickets
-            WHERE "createdAt" >= ${new Date(from)}
-            GROUP BY DATE("createdAt")
-            ORDER BY date ASC
-          `
-        } else if (to) {
-          return prisma.$queryRaw`
-            SELECT DATE("createdAt") as date, COUNT(*)::int as count
-            FROM tickets
-            WHERE "createdAt" <= ${new Date(to + 'T23:59:59')}
-            GROUP BY DATE("createdAt")
-            ORDER BY date ASC
-          `
-        } else {
-          return prisma.$queryRaw`
-            SELECT DATE("createdAt") as date, COUNT(*)::int as count
-            FROM tickets
-            GROUP BY DATE("createdAt")
-            ORDER BY date ASC
-          `
-        }
+        const rows = await prisma.ticket.findMany({
+          where: dateFilter,
+          select: { createdAt: true },
+          orderBy: { createdAt: 'asc' },
+        });
+        // Agrupa no fuso do servidor, para bater com os filtros from/to
+        const counts = new Map();
+        rows.forEach(({ createdAt }) => {
+          const label = [
+            createdAt.getFullYear(),
+            String(createdAt.getMonth() + 1).padStart(2, '0'),
+            String(createdAt.getDate()).padStart(2, '0'),
+          ].join('-');
+          counts.set(label, (counts.get(label) || 0) + 1);
+        });
+        return [...counts.entries()].map(([date, count]) => ({ date, count }));
       })(),
     ]);
 

@@ -14,6 +14,9 @@ const STATUS_OPTIONS = [
   { value: 'CLOSED', label: 'Fechado' },
 ]
 
+const CLOSING_STATUSES = ['RESOLVED', 'CLOSED']
+const STATUS_LABEL = Object.fromEntries(STATUS_OPTIONS.map((s) => [s.value, s.label]))
+
 export default function TicketDetail() {
   const { id } = useParams()
   const navigate = useNavigate()
@@ -25,6 +28,10 @@ export default function TicketDetail() {
   const [timerNote, setTimerNote] = useState('')
   const [activeEntry, setActiveEntry] = useState(null)
   const [elapsed, setElapsed] = useState(0)
+
+  // Encerramento: status pretendido + texto da resolução, enviados juntos
+  const [closing, setClosing] = useState(null)
+  const [resolutionText, setResolutionText] = useState('')
 
   const fetchTicket = useCallback(async () => {
     try {
@@ -51,14 +58,42 @@ export default function TicketDetail() {
     return () => clearInterval(interval)
   }, [activeEntry])
 
-  async function handleStatusChange(status) {
+  function handleStatusClick(status) {
+    // Resolver/fechar pede a resolução na hora; o resto muda direto
+    if (CLOSING_STATUSES.includes(status) && !CLOSING_STATUSES.includes(ticket.status)) {
+      setResolutionText(ticket.resolution || '')
+      setClosing(status)
+      return
+    }
+    updateStatus(status)
+  }
+
+  async function updateStatus(status, resolution) {
+    setSubmitting(true)
     try {
-      await ticketsApi.update(id, { status })
-      toast.success('Status atualizado.')
+      await ticketsApi.update(id, resolution ? { status, resolution } : { status })
+      toast.success(
+        resolution
+          ? 'Chamado encerrado e solicitante notificado por e-mail.'
+          : 'Status atualizado.'
+      )
+      setClosing(null)
+      setResolutionText('')
       fetchTicket()
     } catch (err) {
       toast.error(err.response?.data?.error || 'Erro ao atualizar.')
+    } finally {
+      setSubmitting(false)
     }
+  }
+
+  function handleConfirmClosing(e) {
+    e.preventDefault()
+    if (!resolutionText.trim()) {
+      toast.error('Descreva o que foi feito para resolver o chamado.')
+      return
+    }
+    updateStatus(closing, resolutionText.trim())
   }
 
   async function handleComment(e) {
@@ -118,7 +153,10 @@ export default function TicketDetail() {
       <div className="flex items-start justify-between gap-4">
         <div>
           <button onClick={() => navigate(-1)} className="text-sm text-blue-600 hover:underline mb-2">← Voltar</button>
-          <h2 className="text-xl font-semibold">{ticket.title}</h2>
+          <h2 className="text-xl font-semibold">
+            <span className="text-gray-400 font-mono mr-2">#{ticket.number}</span>
+            {ticket.title}
+          </h2>
           <p className="text-sm text-gray-500 mt-1">
             {ticket.machine?.name} · aberto por {ticket.openedBy?.name} em{' '}
             {format(new Date(ticket.createdAt), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}
@@ -135,6 +173,21 @@ export default function TicketDetail() {
         <h3 className="text-sm font-semibold text-gray-600 mb-2">Descrição</h3>
         <p className="text-sm text-gray-700 whitespace-pre-wrap">{ticket.description}</p>
       </div>
+
+      {/* Resolução */}
+      {ticket.resolution && (
+        <div className="card border-green-200 bg-green-50">
+          <h3 className="text-sm font-semibold text-green-800 mb-2">
+            Resolução
+            {ticket.resolvedAt && (
+              <span className="font-normal text-green-700">
+                {' '}· {format(new Date(ticket.resolvedAt), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}
+              </span>
+            )}
+          </h3>
+          <p className="text-sm text-green-900 whitespace-pre-wrap">{ticket.resolution}</p>
+        </div>
+      )}
 
       {/* Timer (somente técnico) */}
       {isTech && (
@@ -168,11 +221,21 @@ export default function TicketDetail() {
           <h3 className="text-sm font-semibold text-gray-600 mb-3">Alterar Status</h3>
           <div className="flex flex-wrap gap-2">
             {STATUS_OPTIONS.filter((s) => s.value !== ticket.status).map((s) => (
-              <button key={s.value} onClick={() => handleStatusChange(s.value)} className="btn-secondary text-xs">
+              <button
+                key={s.value}
+                onClick={() => handleStatusClick(s.value)}
+                disabled={submitting}
+                className="btn-secondary text-xs"
+              >
                 {s.label}
               </button>
             ))}
           </div>
+          {activeEntry && (
+            <p className="text-xs text-gray-400 mt-2">
+              Há um atendimento em andamento — ele será encerrado junto com o chamado.
+            </p>
+          )}
         </div>
       )}
 
@@ -228,6 +291,48 @@ export default function TicketDetail() {
           </form>
         )}
       </div>
+
+      {/* Modal de encerramento */}
+      {closing && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <form onSubmit={handleConfirmClosing} className="card w-full max-w-lg space-y-4">
+            <div>
+              <h3 className="text-base font-semibold">
+                Marcar como {STATUS_LABEL[closing]}
+              </h3>
+              <p className="text-sm text-gray-500 mt-1">
+                O texto abaixo é gravado no chamado, entra no histórico de comentários e é
+                enviado por e-mail para {ticket.openedBy?.name}.
+              </p>
+            </div>
+
+            <div>
+              <label className="label">O que foi feito para resolver?</label>
+              <textarea
+                className="input min-h-[120px] resize-y"
+                autoFocus
+                value={resolutionText}
+                onChange={(e) => setResolutionText(e.target.value)}
+                placeholder="Ex.: Substituída a fonte da máquina e testada a impressão."
+              />
+            </div>
+
+            <div className="flex justify-end gap-2">
+              <button
+                type="button"
+                className="btn-secondary"
+                onClick={() => { setClosing(null); setResolutionText('') }}
+                disabled={submitting}
+              >
+                Cancelar
+              </button>
+              <button type="submit" className="btn-primary" disabled={submitting}>
+                {submitting ? 'Encerrando...' : `Encerrar e notificar`}
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
     </div>
   )
 }
